@@ -14,6 +14,48 @@ This is a **Console-based Queens Puzzle Game** implemented in C++ that demonstra
 
 ---
 
+## 🎯 Visual Architecture Overview
+
+```
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                        QUEENS PUZZLE GAME ARCHITECTURE                          │
+├─────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                 │
+│    ┌──────────────────────────────────────────────────────────────────────┐    │
+│    │                         MAIN GAME CLASS                              │    │
+│    │                          (QueensGame)                                │    │
+│    │  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐                  │    │
+│    │  │   board     │  │  colorGrid  │  │ queenCount  │                  │    │
+│    │  │  [8][8]     │  │   [8][8]    │  │  moveCount  │                  │    │
+│    │  │  2D Array   │  │  2D Array   │  │             │                  │    │
+│    │  └─────────────┘  └─────────────┘  └─────────────┘                  │    │
+│    │         │                │                                          │    │
+│    │         ▼                ▼                                          │    │
+│    │  ┌─────────────────────────────────────────────┐                    │    │
+│    │  │           ConflictGraph (Graph)             │                    │    │
+│    │  │    rowConflicts[8] colConflicts[8]          │                    │    │
+│    │  │           colorConflicts[8]                 │                    │    │
+│    │  └─────────────────────────────────────────────┘                    │    │
+│    └──────────────────────────────────────────────────────────────────────┘    │
+│              │                  │                    │                         │
+│              ▼                  ▼                    ▼                         │
+│    ┌──────────────┐   ┌──────────────┐    ┌──────────────┐                    │
+│    │ MoveHistory  │   │ UndoRedoList │    │CircularMenu  │                    │
+│    │   (Singly    │   │   (Doubly    │    │  (Circular   │                    │
+│    │Linked List)  │   │ Linked List) │    │ Linked List) │                    │
+│    └──────────────┘   └──────────────┘    └──────────────┘                    │
+│                              │                                                 │
+│                              ▼                                                 │
+│                    ┌──────────────────┐                                       │
+│                    │  GameRecordsBST  │                                       │
+│                    │      (BST)       │                                       │
+│                    └──────────────────┘                                       │
+│                                                                                │
+└─────────────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
 ## 🗂️ Data Structures Used
 
 ### 1. Singly Linked List (`MoveHistory`)
@@ -26,6 +68,44 @@ MoveNode:
 ├── col (int)        - Column position of move
 ├── actionType (int) - 1=Place, 2=Remove, 3=MarkX, 4=Clear
 └── next (MoveNode*) - Pointer to next node
+```
+
+#### 📊 Visual Representation:
+
+```
+                    SINGLY LINKED LIST - MOVE HISTORY
+    ┌──────────────────────────────────────────────────────────────────┐
+    │                                                                  │
+    │   HEAD                                                           │
+    │    │                                                             │
+    │    ▼                                                             │
+    │  ┌─────────────┐    ┌─────────────┐    ┌─────────────┐          │
+    │  │ MoveNode    │    │ MoveNode    │    │ MoveNode    │          │
+    │  ├─────────────┤    ├─────────────┤    ├─────────────┤          │
+    │  │ row: 3      │    │ row: 1      │    │ row: 0      │          │
+    │  │ col: 4      │───▶│ col: 2      │───▶│ col: 7      │───▶ NULL │
+    │  │ action: 1   │    │ action: 2   │    │ action: 1   │          │
+    │  │ (Place Q)   │    │ (Remove Q)  │    │ (Place Q)   │          │
+    │  └─────────────┘    └─────────────┘    └─────────────┘          │
+    │       ▲                                                          │
+    │       │                                                          │
+    │   NEWEST MOVE                               OLDEST MOVE          │
+    │   (count = 3)                                                    │
+    │                                                                  │
+    └──────────────────────────────────────────────────────────────────┘
+    
+    OPERATIONS (STACK-LIKE BEHAVIOR - LIFO):
+    
+    addMove(5, 2, 1):                           removeLastMove():
+    ┌─────────────┐                             
+    │ New Node    │                             HEAD moves to
+    │ row: 5      │                             next node
+    │ col: 2      │───▶ [Previous HEAD]         [Deleted]───▶[New HEAD]
+    │ action: 1   │                             
+    └─────────────┘                             
+          ▲                                     
+          │                                     
+      NEW HEAD                                  
 ```
 
 **Operations:**
@@ -58,6 +138,72 @@ UndoNode:
 └── next (UndoNode*) - Pointer to next action
 ```
 
+#### 📊 Visual Representation:
+
+```
+                       DOUBLY LINKED LIST - UNDO/REDO SYSTEM
+    ┌──────────────────────────────────────────────────────────────────────────┐
+    │                                                                          │
+    │   HEAD                                              TAIL                 │
+    │    │                                                 │                   │
+    │    ▼                                                 ▼                   │
+    │  ┌──────────┐    ┌──────────┐    ┌──────────┐    ┌──────────┐           │
+    │  │UndoNode  │    │UndoNode  │    │UndoNode  │    │UndoNode  │           │
+    │  ├──────────┤    ├──────────┤    ├──────────┤    ├──────────┤           │
+    │  │row:0,col:1│◀──▶│row:2,col:3│◀──▶│row:4,col:5│◀──▶│row:6,col:7│          │
+    │  │prev:0→1  │    │prev:0→1  │    │prev:0→2  │    │prev:0→1  │           │
+    │  │new: 1    │    │new: 1    │    │new: 2    │    │new: 1    │           │
+    │  └──────────┘    └──────────┘    └──────────┘    └──────────┘           │
+    │       │              │              │                  ▲                 │
+    │      NULL          ◀─┘            ◀─┘            CURRENT ─┘              │
+    │                                                                          │
+    └──────────────────────────────────────────────────────────────────────────┘
+    
+    UNDO OPERATION (Move CURRENT backward):
+    ┌──────────────────────────────────────────────────────────────────────────┐
+    │                                                                          │
+    │   Before UNDO:                     After UNDO:                           │
+    │                                                                          │
+    │   [A] ◀──▶ [B] ◀──▶ [C] ◀──▶ [D]   [A] ◀──▶ [B] ◀──▶ [C] ◀──▶ [D]      │
+    │                            ▲                      ▲                      │
+    │                         CURRENT               CURRENT                    │
+    │                                                                          │
+    │   Board shows state D              Board shows state C                   │
+    │   (D's newState restored           (C's newState active,                 │
+    │    to D's prevState)                D available for redo)                │
+    │                                                                          │
+    └──────────────────────────────────────────────────────────────────────────┘
+    
+    REDO OPERATION (Move CURRENT forward):
+    ┌──────────────────────────────────────────────────────────────────────────┐
+    │                                                                          │
+    │   Before REDO:                     After REDO:                           │
+    │                                                                          │
+    │   [A] ◀──▶ [B] ◀──▶ [C] ◀──▶ [D]   [A] ◀──▶ [B] ◀──▶ [C] ◀──▶ [D]      │
+    │                 ▲                                           ▲            │
+    │              CURRENT                                     CURRENT         │
+    │                                                                          │
+    │   Board shows state B              Board shows state D                   │
+    │                                    (D's newState applied)                │
+    │                                                                          │
+    └──────────────────────────────────────────────────────────────────────────┘
+    
+    NEW ACTION AFTER UNDO (Discards future):
+    ┌──────────────────────────────────────────────────────────────────────────┐
+    │                                                                          │
+    │   Before new action:               After adding [E]:                     │
+    │                                                                          │
+    │   [A] ◀──▶ [B] ◀──▶ [C] ◀──▶ [D]   [A] ◀──▶ [B] ◀──▶ [E]               │
+    │            ▲                                        ▲                    │
+    │         CURRENT                                  CURRENT                 │
+    │                                                   & TAIL                 │
+    │                                                                          │
+    │   Nodes C and D are DELETED        New node E becomes                    │
+    │   (can't redo to them anymore)     the new CURRENT and TAIL              │
+    │                                                                          │
+    └──────────────────────────────────────────────────────────────────────────┘
+```
+
 **Key Variables:**
 - `head` - First action in history
 - `tail` - Last action added
@@ -77,23 +223,6 @@ UndoNode:
 - When new action after undo, discard all "future" actions
 - Each node stores both previous and new state for reversal
 
-**Undo/Redo Concept:**
-```
-Actions: [A] ↔ [B] ↔ [C] ↔ [D]
-                           ↑
-                        current
-
-After 2 undos:
-Actions: [A] ↔ [B] ↔ [C] ↔ [D]
-               ↑
-            current
-
-After new action [E]:
-Actions: [A] ↔ [B] ↔ [E]    (C and D deleted)
-                     ↑
-                  current
-```
-
 ---
 
 ### 3. Circular Linked List (`CircularMenu`)
@@ -107,10 +236,69 @@ MenuNode:
 └── next (MenuNode*) - Pointer to next option (last→first)
 ```
 
-**Circular Nature:**
+#### 📊 Visual Representation:
+
 ```
-[1.Place] → [2.Remove] → [3.MarkX] → ... → [11.Exit] ─┐
-    ↑___________________________________________________│
+                    CIRCULAR LINKED LIST - MENU SYSTEM
+    ┌─────────────────────────────────────────────────────────────────────────┐
+    │                                                                         │
+    │                         ┌──────────────────┐                            │
+    │           ┌─────────────│  11. Exit        │◀─────────────┐             │
+    │           │             └──────────────────┘              │             │
+    │           │                                               │             │
+    │           ▼                                               │             │
+    │    ┌──────────────────┐                          ┌──────────────────┐   │
+    │    │  1. Place Queen  │                          │ 10. View Records │   │
+    │    └──────────────────┘                          └──────────────────┘   │
+    │           │                                               ▲             │
+    │           ▼                                               │             │
+    │    ┌──────────────────┐                          ┌──────────────────┐   │
+    │    │ 2. Remove Queen  │                          │ 9. Restart Game  │   │
+    │    └──────────────────┘                          └──────────────────┘   │
+    │           │                                               ▲             │
+    │           ▼                                               │             │
+    │    ┌──────────────────┐                          ┌──────────────────┐   │
+    │    │   3. Mark X      │           HEAD           │ 8. Show History  │   │
+    │    └──────────────────┘            ↓             └──────────────────┘   │
+    │           │               ┌──────────────┐                ▲             │
+    │           ▼               │  CURRENT ─▶  │                │             │
+    │    ┌──────────────────┐   │   Pointer    │       ┌──────────────────┐   │
+    │    │  4. Clear Cell   │   └──────────────┘       │    7. Redo       │   │
+    │    └──────────────────┘                          └──────────────────┘   │
+    │           │                                               ▲             │
+    │           ▼                                               │             │
+    │    ┌──────────────────┐   ┌──────────────────┐   ┌──────────────────┐   │
+    │    │   5. Get Hint    │──▶│     6. Undo      │──▶│                  │   │
+    │    └──────────────────┘   └──────────────────┘   └──────────────────┘   │
+    │                                                                         │
+    └─────────────────────────────────────────────────────────────────────────┘
+    
+    CIRCULAR NAVIGATION:
+    ┌─────────────────────────────────────────────────────────────────────────┐
+    │                                                                         │
+    │   moveNext():                        movePrev():                        │
+    │                                                                         │
+    │   [1]→[2]→[3]→...→[11]─┐            [1]←[2]←[3]←...←[11]─┐             │
+    │    ▲                   │             │                   ▲              │
+    │    └───────────────────┘             └───────────────────┘              │
+    │                                                                         │
+    │   From option 11, moveNext()         From option 1, movePrev()          │
+    │   goes to option 1 (wraps around)    goes to option 11 (wraps around)   │
+    │                                                                         │
+    └─────────────────────────────────────────────────────────────────────────┘
+    
+    MEMORY STRUCTURE:
+    ┌─────────────────────────────────────────────────────────────────────────┐
+    │                                                                         │
+    │  ┌─────┐    ┌─────┐    ┌─────┐    ┌─────┐           ┌─────┐            │
+    │  │  1  │───▶│  2  │───▶│  3  │───▶│  4  │───▶ ... ─▶│ 11  │────┐       │
+    │  └─────┘    └─────┘    └─────┘    └─────┘           └─────┘    │       │
+    │     ▲                                                          │       │
+    │     │                                                          │       │
+    │     └──────────────────────────────────────────────────────────┘       │
+    │                           (last→first connection)                       │
+    │                                                                         │
+    └─────────────────────────────────────────────────────────────────────────┘
 ```
 
 **Operations:**
@@ -142,13 +330,93 @@ RecordNode:
 └── right (RecordNode*) - Games with more moves
 ```
 
-**Tree Example:**
+#### 📊 Visual Representation:
+
 ```
-                 [15 moves]
-                /          \
-        [10 moves]      [20 moves]
-        /      \            \
-   [8 moves] [12 moves]  [25 moves]
+                     BINARY SEARCH TREE - GAME RECORDS
+    ┌─────────────────────────────────────────────────────────────────────────┐
+    │                                                                         │
+    │                           ROOT                                          │
+    │                            │                                            │
+    │                            ▼                                            │
+    │                    ┌───────────────┐                                    │
+    │                    │  15 moves     │                                    │
+    │                    │  Game #1      │                                    │
+    │                    │  Won: ✓       │                                    │
+    │                    └───────────────┘                                    │
+    │                    /               \                                    │
+    │                   /                 \                                   │
+    │          ┌───────────────┐    ┌───────────────┐                        │
+    │          │  10 moves     │    │  20 moves     │                        │
+    │          │  Game #2      │    │  Game #3      │                        │
+    │          │  Won: ✓       │    │  Won: ✗       │                        │
+    │          └───────────────┘    └───────────────┘                        │
+    │          /             \                \                               │
+    │         /               \                \                              │
+    │ ┌───────────────┐ ┌───────────────┐ ┌───────────────┐                  │
+    │ │   8 moves     │ │  12 moves     │ │  25 moves     │                  │
+    │ │   Game #4     │ │  Game #5      │ │  Game #6      │                  │
+    │ │   Won: ✓      │ │  Won: ✓       │ │  Won: ✗       │                  │
+    │ └───────────────┘ └───────────────┘ └───────────────┘                  │
+    │         ▲                                                               │
+    │         │                                                               │
+    │     BEST GAME                                                           │
+    │   (Minimum moves)                                                       │
+    │                                                                         │
+    └─────────────────────────────────────────────────────────────────────────┘
+    
+    BST PROPERTY:
+    ┌─────────────────────────────────────────────────────────────────────────┐
+    │                                                                         │
+    │   For every node N:                                                     │
+    │   • All nodes in LEFT subtree have moveCount < N.moveCount              │
+    │   • All nodes in RIGHT subtree have moveCount >= N.moveCount            │
+    │                                                                         │
+    │                    ┌──────────┐                                         │
+    │                    │   [15]   │                                         │
+    │                    └──────────┘                                         │
+    │                   /            \                                        │
+    │        ALL < 15 ─┘              └─ ALL >= 15                            │
+    │           │                           │                                 │
+    │     ┌──────────┐               ┌──────────┐                            │
+    │     │ 8,10,12  │               │  20,25   │                            │
+    │     └──────────┘               └──────────┘                            │
+    │                                                                         │
+    └─────────────────────────────────────────────────────────────────────────┘
+    
+    IN-ORDER TRAVERSAL (Sorted Display):
+    ┌─────────────────────────────────────────────────────────────────────────┐
+    │                                                                         │
+    │   Visit order: LEFT → ROOT → RIGHT                                      │
+    │                                                                         │
+    │   Result: 8 → 10 → 12 → 15 → 20 → 25  (Sorted by moves!)               │
+    │                                                                         │
+    │   Game Records (sorted by moves):                                       │
+    │     Game #4: 8 moves  - Won ✓                                          │
+    │     Game #2: 10 moves - Won ✓                                          │
+    │     Game #5: 12 moves - Won ✓                                          │
+    │     Game #1: 15 moves - Won ✓                                          │
+    │     Game #3: 20 moves - Lost ✗                                         │
+    │     Game #6: 25 moves - Lost ✗                                         │
+    │                                                                         │
+    └─────────────────────────────────────────────────────────────────────────┘
+    
+    FIND MINIMUM (Best Game):
+    ┌─────────────────────────────────────────────────────────────────────────┐
+    │                                                                         │
+    │   Algorithm: Follow LEFT pointers until NULL                            │
+    │                                                                         │
+    │                    [15]                                                 │
+    │                    /                                                    │
+    │                  [10]    ←── Go LEFT                                   │
+    │                  /                                                      │
+    │                [8]       ←── Go LEFT                                   │
+    │                /                                                        │
+    │              NULL        ←── STOP! [8] is minimum                      │
+    │                                                                         │
+    │   Time Complexity: O(log n) average, O(n) worst case                   │
+    │                                                                         │
+    └─────────────────────────────────────────────────────────────────────────┘
 ```
 
 **Operations:**
@@ -179,19 +447,93 @@ int colorConflicts[8];  // Queens in each color region
 int colorGrid[8][8];    // Maps cell to color
 ```
 
-**Concept:**
-- Graph nodes = Rows, Columns, Color Regions
-- Graph edges = Cells connecting to their row, column, color
-- Conflict = More than one queen in same row/column/color
+#### 📊 Visual Representation:
 
 ```
-     Rows      Columns    Colors
-     [0]         [0]        [Red]
-     [1]         [1]        [Green]
-     ...         ...        ...
-     [7]         [7]        [Purple]
-     
-Cell (2,3) connects to: Row[2], Col[3], Color[colorGrid[2][3]]
+                        CONFLICT GRAPH STRUCTURE
+    ┌─────────────────────────────────────────────────────────────────────────┐
+    │                                                                         │
+    │   The graph conceptually represents CONSTRAINTS as a tripartite graph:  │
+    │                                                                         │
+    │        ROWS              COLUMNS            COLORS                      │
+    │     ┌───────┐          ┌───────┐          ┌───────┐                    │
+    │     │ Row 0 │          │ Col 0 │          │ Red   │                    │
+    │     │ Row 1 │          │ Col 1 │          │ Green │                    │
+    │     │ Row 2 │          │ Col 2 │          │ Yellow│                    │
+    │     │ Row 3 │          │ Col 3 │          │ Blue  │                    │
+    │     │ Row 4 │          │ Col 4 │          │ Purple│                    │
+    │     │ Row 5 │          │ Col 5 │          │ Cyan  │                    │
+    │     │ Row 6 │          │ Col 6 │          │ Orange│                    │
+    │     │ Row 7 │          │ Col 7 │          │ Pink  │                    │
+    │     └───────┘          └───────┘          └───────┘                    │
+    │                                                                         │
+    │   Each CELL connects to exactly 3 constraint nodes:                     │
+    │                                                                         │
+    │                     Cell (2, 5) with color Yellow                       │
+    │                              │                                          │
+    │              ┌───────────────┼───────────────┐                          │
+    │              │               │               │                          │
+    │              ▼               ▼               ▼                          │
+    │          ┌───────┐      ┌───────┐      ┌───────┐                       │
+    │          │ Row 2 │      │ Col 5 │      │Yellow │                       │
+    │          └───────┘      └───────┘      └───────┘                       │
+    │                                                                         │
+    └─────────────────────────────────────────────────────────────────────────┘
+    
+    ARRAY REPRESENTATION:
+    ┌─────────────────────────────────────────────────────────────────────────┐
+    │                                                                         │
+    │   rowConflicts[8]:      colConflicts[8]:      colorConflicts[8]:       │
+    │   ┌───┬───┬───┬───┬───┬───┬───┬───┐  ┌───┬───┬───┬───┬───┬───┬───┬───┐│
+    │   │ 1 │ 0 │ 1 │ 0 │ 1 │ 0 │ 1 │ 0 │  │ 0 │ 1 │ 0 │ 1 │ 0 │ 1 │ 0 │ 1 ││
+    │   └───┴───┴───┴───┴───┴───┴───┴───┘  └───┴───┴───┴───┴───┴───┴───┴───┘│
+    │     0   1   2   3   4   5   6   7      0   1   2   3   4   5   6   7   │
+    │     ▲       ▲       ▲       ▲          │   ▲       ▲       ▲       ▲   │
+    │     │       │       │       │          │   │       │       │       │   │
+    │     └───────┴───────┴───────┘          └───┴───────┴───────┴───────┘   │
+    │         Queens in these rows              Queens in these columns      │
+    │                                                                         │
+    │   colorConflicts[8]:                                                   │
+    │   ┌───┬───┬───┬───┬───┬───┬───┬───┐                                   │
+    │   │ 1 │ 1 │ 1 │ 1 │ 0 │ 0 │ 0 │ 0 │  ← Queens count per color region │
+    │   └───┴───┴───┴───┴───┴───┴───┴───┘                                   │
+    │    Red Grn Ylw Blu Pur Cyn Org Pnk                                     │
+    │                                                                         │
+    └─────────────────────────────────────────────────────────────────────────┘
+    
+    CONFLICT DETECTION VISUALIZATION:
+    ┌─────────────────────────────────────────────────────────────────────────┐
+    │                                                                         │
+    │   Board State:                       Trying to place at (2,3):         │
+    │                                                                         │
+    │     0   1   2   3   4   5   6   7                                      │
+    │   ┌───┬───┬───┬───┬───┬───┬───┬───┐                                   │
+    │ 0 │   │ Q │   │   │   │   │   │   │  Check Row 2: rowConflicts[2]=1   │
+    │   ├───┼───┼───┼───┼───┼───┼───┼───┤            → CONFLICT! ❌          │
+    │ 1 │   │   │   │   │   │   │   │   │                                    │
+    │   ├───┼───┼───┼───┼───┼───┼───┼───┤  Even if row was clear:           │
+    │ 2 │   │   │   │ ? │   │ Q │   │   │  Check Col 3: colConflicts[3]=?   │
+    │   ├───┼───┼───┼───┼───┼───┼───┼───┤  Check Color: colorConflicts[c]=? │
+    │ 3 │   │   │   │   │   │   │   │   │  Check Diagonals: adjacent cells  │
+    │   ├───┼───┼───┼───┼───┼───┼───┼───┤                                    │
+    │   └───┴───┴───┴───┴───┴───┴───┴───┘                                   │
+    │                                                                         │
+    │   All checks are O(1) array lookups!                                   │
+    │                                                                         │
+    └─────────────────────────────────────────────────────────────────────────┘
+    
+    ADD/REMOVE QUEEN OPERATIONS:
+    ┌─────────────────────────────────────────────────────────────────────────┐
+    │                                                                         │
+    │   addQueen(row=2, col=5):               removeQueen(row=2, col=5):     │
+    │                                                                         │
+    │   rowConflicts[2]++                     rowConflicts[2]--               │
+    │   colConflicts[5]++                     colConflicts[5]--               │
+    │   colorConflicts[colorGrid[2][5]]++     colorConflicts[colorGrid[2][5]]--│
+    │                                                                         │
+    │   Time: O(1)                            Time: O(1)                      │
+    │                                                                         │
+    └─────────────────────────────────────────────────────────────────────────┘
 ```
 
 **Operations:**
@@ -225,13 +567,87 @@ int colorGrid[8][8];
 // Values: 0-7 representing 8 different color regions
 ```
 
-**Visual Representation:**
+#### 📊 Visual Representation:
+
 ```
-Board:                  Color Grid:
-0 0 0 1 0 0 0 0        0 0 1 1 1 2 2 2
-0 0 0 0 0 1 0 0        0 0 0 1 1 1 2 2
-0 0 2 0 0 0 0 0        0 0 3 3 1 2 2 2
-...                     ...
+                          2D ARRAYS - BOARD STATE
+    ┌─────────────────────────────────────────────────────────────────────────┐
+    │                                                                         │
+    │   BOARD ARRAY (board[8][8]):                                           │
+    │   Stores: 0=Empty(.), 1=Queen(Q), 2=Marked(X)                          │
+    │                                                                         │
+    │           Col  0   1   2   3   4   5   6   7                           │
+    │              ┌───┬───┬───┬───┬───┬───┬───┬───┐                         │
+    │       Row 0  │ 0 │ 0 │ 0 │ 1 │ 0 │ 0 │ 0 │ 0 │  ← Queen at (0,3)      │
+    │              ├───┼───┼───┼───┼───┼───┼───┼───┤                         │
+    │       Row 1  │ 0 │ 0 │ 0 │ 0 │ 0 │ 1 │ 0 │ 0 │  ← Queen at (1,5)      │
+    │              ├───┼───┼───┼───┼───┼───┼───┼───┤                         │
+    │       Row 2  │ 0 │ 0 │ 2 │ 0 │ 0 │ 0 │ 0 │ 0 │  ← X mark at (2,2)     │
+    │              ├───┼───┼───┼───┼───┼───┼───┼───┤                         │
+    │       Row 3  │ 0 │ 0 │ 0 │ 0 │ 0 │ 0 │ 0 │ 1 │  ← Queen at (3,7)      │
+    │              ├───┼───┼───┼───┼───┼───┼───┼───┤                         │
+    │       Row 4  │ 0 │ 1 │ 0 │ 0 │ 0 │ 0 │ 0 │ 0 │  ← Queen at (4,1)      │
+    │              ├───┼───┼───┼───┼───┼───┼───┼───┤                         │
+    │       Row 5  │ 0 │ 0 │ 0 │ 0 │ 0 │ 0 │ 2 │ 0 │  ← X mark at (5,6)     │
+    │              ├───┼───┼───┼───┼───┼───┼───┼───┤                         │
+    │       Row 6  │ 0 │ 0 │ 0 │ 0 │ 1 │ 0 │ 0 │ 0 │  ← Queen at (6,4)      │
+    │              ├───┼───┼───┼───┼───┼───┼───┼───┤                         │
+    │       Row 7  │ 0 │ 0 │ 1 │ 0 │ 0 │ 0 │ 0 │ 0 │  ← Queen at (7,2)      │
+    │              └───┴───┴───┴───┴───┴───┴───┴───┘                         │
+    │                                                                         │
+    └─────────────────────────────────────────────────────────────────────────┘
+    
+    COLOR GRID ARRAY (colorGrid[8][8]):
+    ┌─────────────────────────────────────────────────────────────────────────┐
+    │                                                                         │
+    │   Stores color region ID (0-7) for each cell:                          │
+    │                                                                         │
+    │           Col  0   1   2   3   4   5   6   7                           │
+    │              ┌───┬───┬───┬───┬───┬───┬───┬───┐                         │
+    │       Row 0  │ 0 │ 0 │ 0 │ 0 │ 1 │ 1 │ 1 │ 1 │                         │
+    │              ├───┼───┼───┼───┼───┼───┼───┼───┤   Legend:               │
+    │       Row 1  │ 0 │ 2 │ 2 │ 0 │ 1 │ 1 │ 1 │ 1 │   0 = Red              │
+    │              ├───┼───┼───┼───┼───┼───┼───┼───┤   1 = Lime             │
+    │       Row 2  │ 2 │ 2 │ 2 │ 0 │ 3 │ 3 │ 1 │ 1 │   2 = Yellow           │
+    │              ├───┼───┼───┼───┼───┼───┼───┼───┤   3 = Blue             │
+    │       Row 3  │ 2 │ 2 │ 0 │ 0 │ 3 │ 3 │ 3 │ 4 │   4 = Purple           │
+    │              ├───┼───┼───┼───┼───┼───┼───┼───┤   5 = Cyan             │
+    │       Row 4  │ 2 │ 0 │ 0 │ 3 │ 3 │ 3 │ 4 │ 4 │   6 = Orange           │
+    │              ├───┼───┼───┼───┼───┼───┼───┼───┤   7 = Pink             │
+    │       Row 5  │ 5 │ 5 │ 0 │ 3 │ 6 │ 6 │ 4 │ 4 │                         │
+    │              ├───┼───┼───┼───┼───┼───┼───┼───┤                         │
+    │       Row 6  │ 5 │ 5 │ 5 │ 6 │ 6 │ 6 │ 4 │ 4 │                         │
+    │              ├───┼───┼───┼───┼───┼───┼───┼───┤                         │
+    │       Row 7  │ 5 │ 5 │ 5 │ 6 │ 6 │ 7 │ 7 │ 7 │                         │
+    │              └───┴───┴───┴───┴───┴───┴───┴───┘                         │
+    │                                                                         │
+    └─────────────────────────────────────────────────────────────────────────┘
+    
+    VISUAL GAME DISPLAY:
+    ┌─────────────────────────────────────────────────────────────────────────┐
+    │                                                                         │
+    │       0   1   2   3   4   5   6   7                                    │
+    │     +---+---+---+---+---+---+---+---+                                   │
+    │  0  |░░░|░░░|░░░|░Q░|▓▓▓|▓▓▓|▓▓▓|▓▓▓|   ░ = Red region                │
+    │     +---+---+---+---+---+---+---+---+   ▓ = Lime region                │
+    │  1  |░░░|▒▒▒|▒▒▒|░░░|▓▓▓|▓Q▓|▓▓▓|▓▓▓|   ▒ = Yellow region             │
+    │     +---+---+---+---+---+---+---+---+   █ = Blue region                │
+    │  2  |▒▒▒|▒▒▒|▒X▒|░░░|███|███|▓▓▓|▓▓▓|   ▀ = Purple region             │
+    │     +---+---+---+---+---+---+---+---+   ▄ = Cyan region                │
+    │  3  |▒▒▒|▒▒▒|░░░|░░░|███|███|███|▀▀▀|   ◊ = Orange region             │
+    │     +---+---+---+---+---+---+---+---+   ◙ = Pink region                │
+    │  4  |▒▒▒|░Q░|░░░|███|███|███|▀▀▀|▀▀▀|                                  │
+    │     +---+---+---+---+---+---+---+---+                                   │
+    │  5  |▄▄▄|▄▄▄|░░░|███|◊◊◊|◊◊◊|▀X▀|▀▀▀|                                  │
+    │     +---+---+---+---+---+---+---+---+                                   │
+    │  6  |▄▄▄|▄▄▄|▄▄▄|◊◊◊|◊Q◊|◊◊◊|▀▀▀|▀▀▀|                                  │
+    │     +---+---+---+---+---+---+---+---+                                   │
+    │  7  |▄▄▄|▄▄▄|▄Q▄|◊◊◊|◊◊◊|◙◙◙|◙◙◙|◙◙◙|                                  │
+    │     +---+---+---+---+---+---+---+---+                                   │
+    │                                                                         │
+    │   Queens: 7/8  |  Moves: 15                                            │
+    │                                                                         │
+    └─────────────────────────────────────────────────────────────────────────┘
 ```
 
 ---
@@ -241,49 +657,200 @@ Board:                  Color Grid:
 ### 1. Color Region Generation
 **Method:** `generateColorRegions()`
 
-**Algorithm:**
-1. Select one of 5 predefined board patterns randomly
-2. Apply Fisher-Yates shuffle to randomize color assignment
-3. Apply random transformation (rotate/flip)
+#### 📊 Algorithm Visualization:
 
-**Transformations (8 total):**
-- Original
-- Transpose (swap rows and columns)
-- Horizontal flip
-- Vertical flip
-- Combinations of above
-
-**Total Variations:** 5 patterns × 8! permutations × 8 transforms = **161,280 boards**
+```
+                    COLOR REGION GENERATION ALGORITHM
+    ┌─────────────────────────────────────────────────────────────────────────┐
+    │                                                                         │
+    │   STEP 1: Select Random Predefined Pattern (1 of 5)                    │
+    │   ┌───────────────────────────────────────────────────────────────┐    │
+    │   │                                                               │    │
+    │   │   Pattern 1:        Pattern 2:        Pattern 3:             │    │
+    │   │   0 0 0 0 1 1 1 1   0 0 0 1 1 1 1 2   0 0 0 0 1 1 1 1       │    │
+    │   │   0 2 2 0 1 1 1 1   0 0 1 1 1 2 2 2   0 0 2 2 2 1 1 1       │    │
+    │   │   2 2 2 0 3 3 1 1   0 3 3 1 2 2 2 2   0 2 2 2 3 3 1 1       │    │
+    │   │   ...               ...               ...                    │    │
+    │   │                                                               │    │
+    │   │   rand() % 5 → Select one pattern                            │    │
+    │   │                                                               │    │
+    │   └───────────────────────────────────────────────────────────────┘    │
+    │                              │                                          │
+    │                              ▼                                          │
+    │   STEP 2: Fisher-Yates Shuffle for Color Assignment                    │
+    │   ┌───────────────────────────────────────────────────────────────┐    │
+    │   │                                                               │    │
+    │   │   Original:  [0, 1, 2, 3, 4, 5, 6, 7]                        │    │
+    │   │                                                               │    │
+    │   │   Shuffle Process:                                           │    │
+    │   │   i=7: swap(shuffle[7], shuffle[rand()%8])                   │    │
+    │   │   i=6: swap(shuffle[6], shuffle[rand()%7])                   │    │
+    │   │   ...                                                         │    │
+    │   │   i=1: swap(shuffle[1], shuffle[rand()%2])                   │    │
+    │   │                                                               │    │
+    │   │   Result:    [3, 7, 1, 5, 0, 2, 6, 4]  (random permutation)  │    │
+    │   │                                                               │    │
+    │   │   Mapping: Pattern color 0 → Actual color 3                  │    │
+    │   │            Pattern color 1 → Actual color 7                  │    │
+    │   │            ...                                                │    │
+    │   │                                                               │    │
+    │   └───────────────────────────────────────────────────────────────┘    │
+    │                              │                                          │
+    │                              ▼                                          │
+    │   STEP 3: Apply Random Transformation (1 of 8)                         │
+    │   ┌───────────────────────────────────────────────────────────────┐    │
+    │   │                                                               │    │
+    │   │   transform = rand() % 8                                     │    │
+    │   │                                                               │    │
+    │   │   ┌─────────────┐  ┌─────────────┐  ┌─────────────┐         │    │
+    │   │   │  Original   │  │  Transpose  │  │  H-Flip     │         │    │
+    │   │   │  A B C D    │  │  A E I M    │  │  D C B A    │         │    │
+    │   │   │  E F G H    │  │  B F J N    │  │  H G F E    │         │    │
+    │   │   │  I J K L    │  │  C G K O    │  │  L K J I    │         │    │
+    │   │   │  M N O P    │  │  D H L P    │  │  P O N M    │         │    │
+    │   │   └─────────────┘  └─────────────┘  └─────────────┘         │    │
+    │   │                                                               │    │
+    │   │   ┌─────────────┐  ┌─────────────┐                          │    │
+    │   │   │  V-Flip     │  │ Combinations│                          │    │
+    │   │   │  M N O P    │  │  of above   │                          │    │
+    │   │   │  I J K L    │  │  (8 total)  │                          │    │
+    │   │   │  E F G H    │  │             │                          │    │
+    │   │   │  A B C D    │  │             │                          │    │
+    │   │   └─────────────┘  └─────────────┘                          │    │
+    │   │                                                               │    │
+    │   └───────────────────────────────────────────────────────────────┘    │
+    │                                                                         │
+    │   TOTAL VARIATIONS: 5 patterns × 8! permutations × 8 transforms        │
+    │                   = 5 × 40,320 × 8 = 1,612,800 unique boards!          │
+    │                                                                         │
+    └─────────────────────────────────────────────────────────────────────────┘
+```
 
 ---
 
 ### 2. Queen Placement Validation
 **Method:** `canPlaceQueen(int row, int col)`
 
-```
-Checks (in order):
-1. Position valid (0-7 range)?
-2. Cell empty (not queen or X)?
-3. Row conflict? (ConflictGraph)
-4. Column conflict? (ConflictGraph)
-5. Color region conflict? (ConflictGraph)
-6. Diagonal touch? (Check 4 diagonal neighbors)
-```
+#### 📊 Validation Flow:
 
-**Time Complexity:** O(1) - All checks are constant time
+```
+                    QUEEN PLACEMENT VALIDATION ALGORITHM
+    ┌─────────────────────────────────────────────────────────────────────────┐
+    │                                                                         │
+    │   canPlaceQueen(row, col)                                              │
+    │                                                                         │
+    │   ┌─────────────────────────────────────────────────────────────────┐  │
+    │   │                                                                 │  │
+    │   │   START                                                        │  │
+    │   │     │                                                          │  │
+    │   │     ▼                                                          │  │
+    │   │   ┌───────────────────────┐                                    │  │
+    │   │   │ Is position valid?    │──── NO ───▶ return FALSE           │  │
+    │   │   │ (0 ≤ row,col < 8)     │                                    │  │
+    │   │   └───────────────────────┘                                    │  │
+    │   │     │ YES                                                      │  │
+    │   │     ▼                                                          │  │
+    │   │   ┌───────────────────────┐                                    │  │
+    │   │   │ Is cell empty?        │──── NO ───▶ return FALSE           │  │
+    │   │   │ (board[row][col]==0)  │            (Queen/X already there) │  │
+    │   │   └───────────────────────┘                                    │  │
+    │   │     │ YES                                                      │  │
+    │   │     ▼                                                          │  │
+    │   │   ┌───────────────────────┐                                    │  │
+    │   │   │ Row conflict?         │──── YES ──▶ return FALSE           │  │
+    │   │   │ (rowConflicts[row]>0) │            (Row has a queen)       │  │
+    │   │   └───────────────────────┘                                    │  │
+    │   │     │ NO                                                       │  │
+    │   │     ▼                                                          │  │
+    │   │   ┌───────────────────────┐                                    │  │
+    │   │   │ Column conflict?      │──── YES ──▶ return FALSE           │  │
+    │   │   │ (colConflicts[col]>0) │            (Column has a queen)    │  │
+    │   │   └───────────────────────┘                                    │  │
+    │   │     │ NO                                                       │  │
+    │   │     ▼                                                          │  │
+    │   │   ┌───────────────────────┐                                    │  │
+    │   │   │ Color region conflict?│──── YES ──▶ return FALSE           │  │
+    │   │   │ (colorConflicts[c]>0) │            (Color has a queen)     │  │
+    │   │   └───────────────────────┘                                    │  │
+    │   │     │ NO                                                       │  │
+    │   │     ▼                                                          │  │
+    │   │   ┌───────────────────────┐                                    │  │
+    │   │   │ Diagonal touch?       │──── YES ──▶ return FALSE           │  │
+    │   │   │ (hasDiagonalTouch())  │            (Adjacent queen diag)   │  │
+    │   │   └───────────────────────┘                                    │  │
+    │   │     │ NO                                                       │  │
+    │   │     ▼                                                          │  │
+    │   │   return TRUE ✓                                                │  │
+    │   │   (All checks passed - safe to place!)                         │  │
+    │   │                                                                 │  │
+    │   └─────────────────────────────────────────────────────────────────┘  │
+    │                                                                         │
+    │   Time Complexity: O(1) - All checks are constant time!                │
+    │                                                                         │
+    └─────────────────────────────────────────────────────────────────────────┘
+```
 
 ---
 
 ### 3. Diagonal Touch Detection
 **Method:** `hasDiagonalTouch(int row, int col)`
 
+#### 📊 Visual Representation:
+
 ```
-Check 4 diagonal neighbors:
-    [r-1,c-1]       [r-1,c+1]
-           \         /
-            [r, c]
-           /         \
-    [r+1,c-1]       [r+1,c+1]
+                      DIAGONAL TOUCH DETECTION
+    ┌─────────────────────────────────────────────────────────────────────────┐
+    │                                                                         │
+    │   Check 4 diagonal neighbors of cell (row, col):                       │
+    │                                                                         │
+    │   ┌───────────────────────────────────────────────────────────────┐    │
+    │   │                                                               │    │
+    │   │        [r-1,c-1]           [r-1,c+1]                         │    │
+    │   │              ↖               ↗                                │    │
+    │   │                  ┌───────┐                                    │    │
+    │   │                  │ (r,c) │  ← Cell being checked             │    │
+    │   │                  │   ?   │                                    │    │
+    │   │                  └───────┘                                    │    │
+    │   │              ↙               ↘                                │    │
+    │   │        [r+1,c-1]           [r+1,c+1]                         │    │
+    │   │                                                               │    │
+    │   └───────────────────────────────────────────────────────────────┘    │
+    │                                                                         │
+    │   EXAMPLE - Checking if (3,4) can have a queen:                        │
+    │                                                                         │
+    │   ┌───────────────────────────────────────────────────────────────┐    │
+    │   │                                                               │    │
+    │   │         0   1   2   3   4   5   6   7                        │    │
+    │   │       +---+---+---+---+---+---+---+---+                       │    │
+    │   │    2  |   |   |   | Q |   |   |   |   |  ← Check (2,3): Q!   │    │
+    │   │       +---+---+---+---+---+---+---+---+       CONFLICT! ❌     │    │
+    │   │    3  |   |   |   |   | ? |   |   |   |  ← Target cell       │    │
+    │   │       +---+---+---+---+---+---+---+---+                       │    │
+    │   │    4  |   |   |   |   |   |   |   |   |                      │    │
+    │   │       +---+---+---+---+---+---+---+---+                       │    │
+    │   │                                                               │    │
+    │   │   Diagonal checks:                                            │    │
+    │   │   • (2,3) - Has Queen Q → CONFLICT!                          │    │
+    │   │   • (2,5) - Empty → OK                                       │    │
+    │   │   • (4,3) - Empty → OK                                       │    │
+    │   │   • (4,5) - Empty → OK                                       │    │
+    │   │                                                               │    │
+    │   │   Result: Cannot place queen at (3,4)                        │    │
+    │   │                                                               │    │
+    │   └───────────────────────────────────────────────────────────────┘    │
+    │                                                                         │
+    │   Algorithm:                                                           │
+    │   dr[] = {-1, -1, +1, +1}  // Row deltas                               │
+    │   dc[] = {-1, +1, -1, +1}  // Column deltas                            │
+    │                                                                         │
+    │   for d = 0 to 3:                                                      │
+    │       nr = row + dr[d]                                                 │
+    │       nc = col + dc[d]                                                 │
+    │       if valid(nr,nc) AND board[nr][nc] == QUEEN:                      │
+    │           return TRUE (has diagonal touch)                             │
+    │   return FALSE                                                         │
+    │                                                                         │
+    └─────────────────────────────────────────────────────────────────────────┘
 ```
 
 ---
@@ -291,45 +858,251 @@ Check 4 diagonal neighbors:
 ### 4. Auto-Mark Invalid Cells
 **Method:** `recalculateInvalidMarks()`
 
-After each move:
-1. Clear all X marks
-2. For each empty cell, check if queen can be placed
-3. If not valid, mark as X
+#### 📊 Algorithm Flow:
+
+```
+                    AUTO-MARK INVALID CELLS ALGORITHM
+    ┌─────────────────────────────────────────────────────────────────────────┐
+    │                                                                         │
+    │   BEFORE: After placing queen at (2,5)                                 │
+    │   ┌───────────────────────────────────────────────────────────────┐    │
+    │   │                                                               │    │
+    │   │         0   1   2   3   4   5   6   7                        │    │
+    │   │       +---+---+---+---+---+---+---+---+                       │    │
+    │   │    0  | . | . | . | . | . | . | . | . |                       │    │
+    │   │       +---+---+---+---+---+---+---+---+                       │    │
+    │   │    1  | . | . | . | . | . | . | . | . |                       │    │
+    │   │       +---+---+---+---+---+---+---+---+                       │    │
+    │   │    2  | . | . | . | . | . | Q | . | . |  ← Queen placed      │    │
+    │   │       +---+---+---+---+---+---+---+---+                       │    │
+    │   │    3  | . | . | . | . | . | . | . | . |                       │    │
+    │   │       +---+---+---+---+---+---+---+---+                       │    │
+    │   │                                                               │    │
+    │   └───────────────────────────────────────────────────────────────┘    │
+    │                              │                                          │
+    │                              ▼                                          │
+    │   STEP 1: Clear all existing X marks                                   │
+    │   ┌───────────────────────────────────────────────────────────────┐    │
+    │   │   for each cell (i, j):                                       │    │
+    │   │       if board[i][j] == 2 (X mark):                          │    │
+    │   │           board[i][j] = 0 (empty)                            │    │
+    │   └───────────────────────────────────────────────────────────────┘    │
+    │                              │                                          │
+    │                              ▼                                          │
+    │   STEP 2: For each empty cell, check if queen can be placed            │
+    │   ┌───────────────────────────────────────────────────────────────┐    │
+    │   │   for each cell (i, j):                                       │    │
+    │   │       if board[i][j] == 0 (empty):                           │    │
+    │   │           if NOT canPlaceQueen(i, j):                        │    │
+    │   │               board[i][j] = 2 (mark as X)                    │    │
+    │   └───────────────────────────────────────────────────────────────┘    │
+    │                              │                                          │
+    │                              ▼                                          │
+    │   AFTER: Invalid cells automatically marked                            │
+    │   ┌───────────────────────────────────────────────────────────────┐    │
+    │   │                                                               │    │
+    │   │         0   1   2   3   4   5   6   7                        │    │
+    │   │       +---+---+---+---+---+---+---+---+                       │    │
+    │   │    0  | . | . | . | . | . | X | . | . |  ← Col 5 blocked     │    │
+    │   │       +---+---+---+---+---+---+---+---+                       │    │
+    │   │    1  | . | . | . | . | X | X | X | . |  ← Col 5 + diagonals │    │
+    │   │       +---+---+---+---+---+---+---+---+                       │    │
+    │   │    2  | X | X | X | X | X | Q | X | X |  ← Entire row blocked│    │
+    │   │       +---+---+---+---+---+---+---+---+                       │    │
+    │   │    3  | . | . | . | . | X | X | X | . |  ← Col 5 + diagonals │    │
+    │   │       +---+---+---+---+---+---+---+---+                       │    │
+    │   │    4  | . | . | . | . | . | X | . | . |  ← Col 5 blocked     │    │
+    │   │       +---+---+---+---+---+---+---+---+                       │    │
+    │   │                                                               │    │
+    │   │   Note: Same color region cells also marked (not shown)      │    │
+    │   │                                                               │    │
+    │   └───────────────────────────────────────────────────────────────┘    │
+    │                                                                         │
+    └─────────────────────────────────────────────────────────────────────────┘
+```
 
 ---
 
 ### 5. Hint Algorithm
 **Method:** `showHint()`
 
-**Strategy:** Find the cell that blocks the fewest future options
+#### 📊 Strategy Visualization:
 
 ```
-For each valid cell:
-    count = empty cells in same row
-          + empty cells in same column
-          + empty cells in same color
-          + empty diagonal neighbors
-    
-Suggest cell with minimum count
+                         HINT ALGORITHM - MINIMUM BLOCKING
+    ┌─────────────────────────────────────────────────────────────────────────┐
+    │                                                                         │
+    │   STRATEGY: Find the cell that blocks the FEWEST future options        │
+    │                                                                         │
+    │   For each valid empty cell, calculate "blocking score":               │
+    │   ┌───────────────────────────────────────────────────────────────┐    │
+    │   │                                                               │    │
+    │   │   blockingScore(row, col) =                                  │    │
+    │   │       (empty cells in same row)                              │    │
+    │   │     + (empty cells in same column)                           │    │
+    │   │     + (empty cells in same color region)                     │    │
+    │   │     + (empty diagonal neighbors)                             │    │
+    │   │                                                               │    │
+    │   └───────────────────────────────────────────────────────────────┘    │
+    │                                                                         │
+    │   EXAMPLE:                                                             │
+    │   ┌───────────────────────────────────────────────────────────────┐    │
+    │   │                                                               │    │
+    │   │   Checking cell (0, 2):                                      │    │
+    │   │                                                               │    │
+    │   │         0   1   2   3   4   5   6   7                        │    │
+    │   │       +---+---+---+---+---+---+---+---+                       │    │
+    │   │    0  | . | . | ? | . | . | . | . | . |  Row 0: 7 empty     │    │
+    │   │       +---+---+---+---+---+---+---+---+                       │    │
+    │   │    1  | . | . | . | . | . | . | . | . |                       │    │
+    │   │       +---+---+---+---+---+---+---+---+  Col 2: 7 empty      │    │
+    │   │    2  | . | . | . | . | . | . | . | . |                       │    │
+    │   │       +---+---+---+---+---+---+---+---+  Color: 5 empty      │    │
+    │   │    ...                                                        │    │
+    │   │                                                               │    │
+    │   │   Diagonal neighbors (1,1), (1,3): 2 empty                   │    │
+    │   │                                                               │    │
+    │   │   Total blocking score: 7 + 7 + 5 + 2 = 21                   │    │
+    │   │                                                               │    │
+    │   └───────────────────────────────────────────────────────────────┘    │
+    │                                                                         │
+    │   ALGORITHM FLOW:                                                      │
+    │   ┌───────────────────────────────────────────────────────────────┐    │
+    │   │                                                               │    │
+    │   │   bestRow = -1, bestCol = -1                                 │    │
+    │   │   minScore = INFINITY                                        │    │
+    │   │                                                               │    │
+    │   │   for each cell (i, j):                                      │    │
+    │   │       if canPlaceQueen(i, j):                                │    │
+    │   │           score = calculateBlockingScore(i, j)               │    │
+    │   │           if score < minScore:                               │    │
+    │   │               minScore = score                               │    │
+    │   │               bestRow = i                                    │    │
+    │   │               bestCol = j                                    │    │
+    │   │                                                               │    │
+    │   │   SUGGEST: Place queen at (bestRow, bestCol)                 │    │
+    │   │                                                               │    │
+    │   └───────────────────────────────────────────────────────────────┘    │
+    │                                                                         │
+    │   WHY THIS WORKS:                                                      │
+    │   • Cells with low blocking scores have fewer constraints              │
+    │   • Placing queens in "lonely" areas leaves more options open          │
+    │   • Corner/edge cells often have lower scores (good targets)           │
+    │                                                                         │
+    └─────────────────────────────────────────────────────────────────────────┘
 ```
-
-**Reasoning:** Placing queen where it blocks fewer cells keeps more options open.
 
 ---
 
 ## 📊 Time & Space Complexity Summary
 
-| Operation | Time | Space | Data Structure |
-|-----------|------|-------|----------------|
-| Place Queen | O(1) | O(1) | Graph, Array |
-| Check Valid | O(1) | O(1) | Graph |
-| Undo/Redo | O(1) | O(n) | Doubly Linked List |
-| Add to History | O(1) | O(n) | Singly Linked List |
-| Add Record | O(log n) | O(n) | BST |
-| Display Records | O(n) | O(1) | BST In-order |
-| Generate Board | O(1) | O(1) | Arrays |
-| Get Hint | O(n²) | O(1) | Brute Force |
-| Display Board | O(n²) | O(1) | Arrays |
+```
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                    TIME & SPACE COMPLEXITY ANALYSIS                             │
+├─────────────────────┬────────────────┬────────────────┬─────────────────────────┤
+│     Operation       │      Time      │     Space      │    Data Structure       │
+├─────────────────────┼────────────────┼────────────────┼─────────────────────────┤
+│ Place Queen         │     O(1)       │     O(1)       │ Graph, Array            │
+├─────────────────────┼────────────────┼────────────────┼─────────────────────────┤
+│ Check Valid         │     O(1)       │     O(1)       │ Graph                   │
+├─────────────────────┼────────────────┼────────────────┼─────────────────────────┤
+│ Undo/Redo           │     O(1)       │     O(n)       │ Doubly Linked List      │
+├─────────────────────┼────────────────┼────────────────┼─────────────────────────┤
+│ Add to History      │     O(1)       │     O(n)       │ Singly Linked List      │
+├─────────────────────┼────────────────┼────────────────┼─────────────────────────┤
+│ Add Record          │   O(log n)     │     O(n)       │ BST                     │
+├─────────────────────┼────────────────┼────────────────┼─────────────────────────┤
+│ Display Records     │     O(n)       │     O(1)       │ BST In-order            │
+├─────────────────────┼────────────────┼────────────────┼─────────────────────────┤
+│ Generate Board      │     O(1)       │     O(1)       │ Arrays                  │
+├─────────────────────┼────────────────┼────────────────┼─────────────────────────┤
+│ Get Hint            │    O(n²)       │     O(1)       │ Brute Force             │
+├─────────────────────┼────────────────┼────────────────┼─────────────────────────┤
+│ Display Board       │    O(n²)       │     O(1)       │ Arrays                  │
+├─────────────────────┼────────────────┼────────────────┼─────────────────────────┤
+│ Menu Navigation     │     O(1)       │     O(1)       │ Circular Linked List    │
+└─────────────────────┴────────────────┴────────────────┴─────────────────────────┘
+
+Where n = number of moves/records (for linked list operations)
+      n² = board size (64 cells for 8×8 board)
+```
+
+---
+
+## 🔄 Data Flow Diagram
+
+```
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                          COMPLETE DATA FLOW DIAGRAM                             │
+├─────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                 │
+│                              ┌──────────────┐                                   │
+│                              │    USER      │                                   │
+│                              │   INPUT      │                                   │
+│                              └──────┬───────┘                                   │
+│                                     │                                           │
+│                    ┌────────────────┼────────────────┐                         │
+│                    ▼                ▼                ▼                         │
+│           ┌────────────────┐ ┌────────────┐ ┌────────────────┐                 │
+│           │ Menu Selection │ │ Row Input  │ │ Column Input   │                 │
+│           │  (1-11)        │ │   (0-7)    │ │    (0-7)       │                 │
+│           └───────┬────────┘ └─────┬──────┘ └───────┬────────┘                 │
+│                   │                │                │                          │
+│                   ▼                └───────┬────────┘                          │
+│         ┌──────────────────┐              │                                    │
+│         │  CircularMenu    │              ▼                                    │
+│         │ (Circular List)  │    ┌──────────────────┐                          │
+│         │                  │    │   QueensGame     │                          │
+│         │ getById(choice)  │    │                  │                          │
+│         └────────┬─────────┘    │  ┌────────────┐  │                          │
+│                  │              │  │ board[8][8]│  │                          │
+│                  ▼              │  └────────────┘  │                          │
+│         ┌──────────────────┐    │        │        │                          │
+│         │  Execute Action  │    │        ▼        │                          │
+│         │                  │────│──▶ Process     │                          │
+│         │  1. Place Queen  │    │      Move       │                          │
+│         │  2. Remove Queen │    │        │        │                          │
+│         │  3. Mark X       │    │        ▼        │                          │
+│         │  4. Clear Cell   │    │  ┌────────────┐ │                          │
+│         │  5. Get Hint     │    │  │ Conflict   │ │                          │
+│         │  6. Undo         │    │  │  Graph     │ │                          │
+│         │  7. Redo         │    │  │ (validate) │ │                          │
+│         │  8. History      │    │  └─────┬──────┘ │                          │
+│         │  9. Restart      │    │        │        │                          │
+│         │ 10. Records      │    └────────┼────────┘                          │
+│         │ 11. Exit         │             │                                    │
+│         └──────────────────┘             │                                    │
+│                  │                       │                                    │
+│     ┌────────────┼───────────────────────┼────────────────┐                  │
+│     │            │                       │                │                  │
+│     ▼            ▼                       ▼                ▼                  │
+│ ┌─────────┐ ┌─────────────┐    ┌──────────────┐   ┌────────────┐            │
+│ │ History │ │ UndoRedo    │    │ ConflictGraph│   │ Records    │            │
+│ │ (Singly │ │ (Doubly     │    │   (Graph)    │   │   (BST)    │            │
+│ │  List)  │ │  List)      │    │              │   │            │            │
+│ └────┬────┘ └──────┬──────┘    └──────┬───────┘   └─────┬──────┘            │
+│      │             │                  │                 │                    │
+│      │    Store    │    Manage        │   Track         │   Store            │
+│      │    Move     │    Undo/         │   Conflicts     │   Game             │
+│      │    Records  │    Redo          │   (Row,Col,     │   Statistics       │
+│      │             │    Actions       │    Color)       │                    │
+│      │             │                  │                 │                    │
+│      └─────────────┴──────────────────┴─────────────────┘                    │
+│                                     │                                        │
+│                                     ▼                                        │
+│                           ┌──────────────────┐                               │
+│                           │   Display Board  │                               │
+│                           │   & Feedback     │                               │
+│                           └──────────────────┘                               │
+│                                     │                                        │
+│                                     ▼                                        │
+│                              ┌──────────────┐                                │
+│                              │    USER      │                                │
+│                              │   OUTPUT     │                                │
+│                              └──────────────┘                                │
+│                                                                               │
+└─────────────────────────────────────────────────────────────────────────────────┘
+```
 
 ---
 
@@ -353,6 +1126,79 @@ Suggest cell with minimum count
 - Grid display with borders
 - Queen count and move counter
 - Per-region queen status
+
+---
+
+## 🏗️ Class Relationship Diagram
+
+```
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                         CLASS RELATIONSHIP DIAGRAM                              │
+├─────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                 │
+│                              ┌────────────────────┐                             │
+│                              │       main()       │                             │
+│                              │                    │                             │
+│                              │  - Game loop       │                             │
+│                              │  - User input      │                             │
+│                              └─────────┬──────────┘                             │
+│                                        │                                        │
+│                         ┌──────────────┼──────────────┐                        │
+│                         │              │              │                        │
+│                         ▼              ▼              ▼                        │
+│              ┌────────────────┐  ┌──────────────┐  ┌───────────────┐           │
+│              │  CircularMenu  │  │  QueensGame  │  │GameRecordsBST │           │
+│              │                │  │              │  │               │           │
+│              │ +addOption()   │  │ +placeQueen()│  │ +addRecord()  │           │
+│              │ +display()     │  │ +removeQueen()│ │ +displayRecs()│           │
+│              │ +moveNext()    │  │ +markX()     │  │ +getBestGame()│           │
+│              │ +movePrev()    │  │ +clearCell() │  │               │           │
+│              │ +getById()     │  │ +undo()      │  └───────┬───────┘           │
+│              │ +getCurrentId()│  │ +redo()      │          │                   │
+│              │                │  │ +showHint()  │          │                   │
+│              └───────┬────────┘  │ +checkWin()  │          │                   │
+│                      │           │ +restart()   │          │ owns              │
+│              owns    │           │ +displayBoard()│        ▼                   │
+│                      ▼           └───────┬───────┘  ┌───────────────┐         │
+│              ┌───────────────┐           │         │   RecordNode  │          │
+│              │   MenuNode    │           │         │               │          │
+│              │               │           │         │ +moveCount    │          │
+│              │ +id           │           │ owns    │ +gameId       │          │
+│              │ +label        │           │         │ +won          │          │
+│              │ +next ────────┤─circular  │         │ +left         │          │
+│              │   (circular)  │           │         │ +right        │          │
+│              └───────────────┘           │         └───────────────┘          │
+│                                          │                                     │
+│              ┌───────────────────────────┼───────────────────────────┐        │
+│              │                           │                           │        │
+│              ▼                           ▼                           ▼        │
+│    ┌──────────────────┐      ┌────────────────────┐      ┌──────────────────┐ │
+│    │   MoveHistory    │      │   ConflictGraph    │      │   UndoRedoList   │ │
+│    │                  │      │                    │      │                  │ │
+│    │ +addMove()       │      │ +addQueen()        │      │ +addAction()     │ │
+│    │ +getLastMove()   │      │ +removeQueen()     │      │ +undo()          │ │
+│    │ +removeLastMove()│      │ +hasRowConflict()  │      │ +redo()          │ │
+│    │ +display()       │      │ +hasColConflict()  │      │ +canUndo()       │ │
+│    │ +clear()         │      │ +hasColorConflict()│      │ +canRedo()       │ │
+│    │                  │      │ +reset()           │      │ +clear()         │ │
+│    └────────┬─────────┘      └────────────────────┘      └────────┬─────────┘ │
+│             │                         │                           │           │
+│       owns  │                   uses arrays                 owns  │           │
+│             ▼                         │                           ▼           │
+│    ┌──────────────────┐               │                 ┌──────────────────┐  │
+│    │    MoveNode      │               │                 │    UndoNode      │  │
+│    │                  │      ┌────────┴────────┐        │                  │  │
+│    │ +row             │      │                 │        │ +row             │  │
+│    │ +col             │      ▼                 ▼        │ +col             │  │
+│    │ +actionType      │   int[8]           int[8][8]   │ +prevState       │  │
+│    │ +next ───────────┤   rowConflicts     colorGrid   │ +newState        │  │
+│    │  (singly linked) │   colConflicts                 │ +prev ◀──────────┤  │
+│    └──────────────────┘   colorConflicts               │ +next ──────────▶│  │
+│                                                         │  (doubly linked) │  │
+│                                                         └──────────────────┘  │
+│                                                                                │
+└─────────────────────────────────────────────────────────────────────────────────┘
+```
 
 ---
 
@@ -439,3 +1285,115 @@ Queens.cpp
 ---
 
 *Created for DSA Course Project - Queens Puzzle Game*
+
+---
+
+## 📈 Data Structure Summary Visualization
+
+```
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                    ALL DATA STRUCTURES AT A GLANCE                              │
+├─────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                 │
+│  1. SINGLY LINKED LIST (MoveHistory)                                           │
+│     ┌─────┐    ┌─────┐    ┌─────┐                                              │
+│     │Move3│───▶│Move2│───▶│Move1│───▶ NULL                                     │
+│     └─────┘    └─────┘    └─────┘                                              │
+│     HEAD (newest)         (oldest)                                              │
+│     Purpose: Track all game moves in LIFO order                                │
+│                                                                                 │
+│  2. DOUBLY LINKED LIST (UndoRedoList)                                          │
+│     NULL ◀───┌──────┐◀───▶┌──────┐◀───▶┌──────┐───▶ NULL                       │
+│              │Action│     │Action│     │Action│                                │
+│              │  1   │     │  2   │     │  3   │                                │
+│              └──────┘     └──────┘     └──────┘                                │
+│              HEAD                      TAIL/CURRENT                            │
+│     Purpose: Enable undo/redo with bidirectional traversal                     │
+│                                                                                 │
+│  3. CIRCULAR LINKED LIST (CircularMenu)                                        │
+│              ┌───────────────────────────────────┐                              │
+│              │                                   │                              │
+│              ▼                                   │                              │
+│     ┌───────┐   ┌───────┐   ┌───────┐   ┌───────┐                              │
+│     │Menu 1 │──▶│Menu 2 │──▶│  ...  │──▶│Menu 11│──┘                           │
+│     └───────┘   └───────┘   └───────┘   └───────┘                              │
+│     HEAD                                                                        │
+│     Purpose: Wrap-around menu navigation                                       │
+│                                                                                 │
+│  4. BINARY SEARCH TREE (GameRecordsBST)                                        │
+│                        ┌───────────┐                                            │
+│                        │15 moves   │                                            │
+│                        │ (root)    │                                            │
+│                        └───────────┘                                            │
+│                       /             \                                           │
+│              ┌───────────┐     ┌───────────┐                                   │
+│              │10 moves   │     │20 moves   │                                   │
+│              │ (left)    │     │ (right)   │                                   │
+│              └───────────┘     └───────────┘                                   │
+│     Purpose: Store game records sorted by move count                           │
+│                                                                                 │
+│  5. GRAPH (ConflictGraph) - Array Representation                               │
+│     rowConflicts[8]   colConflicts[8]   colorConflicts[8]                      │
+│     ┌─┬─┬─┬─┬─┬─┬─┬─┐ ┌─┬─┬─┬─┬─┬─┬─┬─┐ ┌─┬─┬─┬─┬─┬─┬─┬─┐                      │
+│     │0│1│0│0│1│0│0│0│ │0│0│1│0│0│1│0│0│ │1│1│0│0│1│0│0│0│                      │
+│     └─┴─┴─┴─┴─┴─┴─┴─┘ └─┴─┴─┴─┴─┴─┴─┴─┘ └─┴─┴─┴─┴─┴─┴─┴─┘                      │
+│     Purpose: O(1) conflict detection for queen placement                       │
+│                                                                                 │
+│  6. 2D ARRAYS (Board & ColorGrid)                                              │
+│     board[8][8]              colorGrid[8][8]                                   │
+│     ┌─┬─┬─┬─┬─┬─┬─┬─┐        ┌─┬─┬─┬─┬─┬─┬─┬─┐                                │
+│     │.│.│.│Q│.│.│.│.│        │0│0│0│0│1│1│1│1│                                │
+│     │.│.│.│.│.│Q│.│.│        │0│2│2│0│1│1│1│1│                                │
+│     │.│.│X│.│.│.│.│.│        │2│2│2│0│3│3│1│1│                                │
+│     │.│.│.│.│.│.│.│Q│        │...                                              │
+│     └─┴─┴─┴─┴─┴─┴─┴─┘        └─┴─┴─┴─┴─┴─┴─┴─┘                                │
+│     Purpose: Store board state and color regions                               │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## 🎯 Win Condition Visualization
+
+```
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                              WIN CONDITION                                      │
+├─────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                 │
+│   GOAL: Place exactly 8 queens satisfying ALL constraints                      │
+│                                                                                 │
+│   ✓ One queen per row        (8 rows → 8 queens)                               │
+│   ✓ One queen per column     (8 columns → 8 queens)                            │
+│   ✓ One queen per color      (8 colors → 8 queens)                             │
+│   ✓ No diagonal touching     (queens can't be adjacent diagonally)             │
+│                                                                                 │
+│   WINNING BOARD EXAMPLE:                                                       │
+│                                                                                 │
+│         0   1   2   3   4   5   6   7                                          │
+│       +---+---+---+---+---+---+---+---+                                         │
+│    0  |   |   |   | Q |   |   |   |   |  ← Row 0 has 1 queen                   │
+│       +---+---+---+---+---+---+---+---+                                         │
+│    1  | Q |   |   |   |   |   |   |   |  ← Row 1 has 1 queen                   │
+│       +---+---+---+---+---+---+---+---+                                         │
+│    2  |   |   |   |   |   |   | Q |   |  ← Row 2 has 1 queen                   │
+│       +---+---+---+---+---+---+---+---+                                         │
+│    3  |   |   | Q |   |   |   |   |   |  ← Row 3 has 1 queen                   │
+│       +---+---+---+---+---+---+---+---+                                         │
+│    4  |   |   |   |   |   |   |   | Q |  ← Row 4 has 1 queen                   │
+│       +---+---+---+---+---+---+---+---+                                         │
+│    5  |   | Q |   |   |   |   |   |   |  ← Row 5 has 1 queen                   │
+│       +---+---+---+---+---+---+---+---+                                         │
+│    6  |   |   |   |   | Q |   |   |   |  ← Row 6 has 1 queen                   │
+│       +---+---+---+---+---+---+---+---+                                         │
+│    7  |   |   |   |   |   | Q |   |   |  ← Row 7 has 1 queen                   │
+│       +---+---+---+---+---+---+---+---+                                         │
+│         ↑   ↑   ↑   ↑   ↑   ↑   ↑   ↑                                          │
+│         Columns 0-7: Each has exactly 1 queen                                  │
+│                                                                                 │
+│   Queens: 8/8 ✓  |  PUZZLE SOLVED! 🎉                                          │
+│                                                                                 │
+└─────────────────────────────────────────────────────────────────────────────────┘
+```
+
+---

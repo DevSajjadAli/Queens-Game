@@ -16,21 +16,26 @@ const string MAGENTA = "\033[35m";
 const string CYAN = "\033[36m";
 const string WHITE = "\033[37m";
 const string BLACK = "\033[30m";
-const string BG_RED = "\033[41m";
-const string BG_GREEN = "\033[42m";
-const string BG_YELLOW = "\033[43m";
-const string BG_BLUE = "\033[44m";
-const string BG_MAGENTA = "\033[45m";
-const string BG_CYAN = "\033[46m";
-const string BG_WHITE = "\033[47m";
-const string BG_BRIGHT_RED = "\033[101m";
-const string BG_BRIGHT_GREEN = "\033[102m";
-const string BG_BRIGHT_YELLOW = "\033[103m";
-const string BG_BRIGHT_BLUE = "\033[104m";
-const string BG_BRIGHT_MAGENTA = "\033[105m";
-const string BG_BRIGHT_CYAN = "\033[106m";
-const string BG_BRIGHT_WHITE = "\033[107m";
+const string BG_RED = "\033[48;5;196m";
+const string BG_GREEN = "\033[48;5;46m";
+const string BG_YELLOW = "\033[48;5;226m";
+const string BG_BLUE = "\033[48;5;21m";
+const string BG_MAGENTA = "\033[48;5;201m";
+const string BG_CYAN = "\033[48;5;51m";
+const string BG_WHITE = "\033[48;5;231m";
+const string BG_BRIGHT_RED = "\033[48;5;203m";
+const string BG_BRIGHT_GREEN = "\033[48;5;118m";
+const string BG_BRIGHT_YELLOW = "\033[48;5;228m";
+const string BG_BRIGHT_BLUE = "\033[48;5;39m";
+const string BG_BRIGHT_MAGENTA = "\033[48;5;213m";
+const string BG_BRIGHT_CYAN = "\033[48;5;87m";
+const string BG_BRIGHT_WHITE = "\033[48;5;255m";
 const string BG_ORANGE = "\033[48;5;208m";
+const string BG_PURPLE = "\033[48;5;129m";
+const string BG_PINK = "\033[48;5;205m";
+const string BG_LIME = "\033[48;5;154m";
+const string BG_TEAL = "\033[48;5;30m";
+const string BG_BROWN = "\033[48;5;130m";
 
 struct MoveNode {
 	int row;
@@ -458,13 +463,13 @@ private:
 	GameRecordsBST* records;
 
 	string regionColors[8] = {
-		BG_RED, BG_GREEN, BG_YELLOW, BG_BLUE,
-		BG_MAGENTA, BG_CYAN, BG_ORANGE, BG_BRIGHT_GREEN
+		BG_RED, BG_LIME, BG_YELLOW, BG_BLUE,
+		BG_PURPLE, BG_CYAN, BG_ORANGE, BG_PINK
 	};
 
 	string regionTextColors[8] = {
 		WHITE, BLACK, BLACK, WHITE,
-		WHITE, BLACK, BLACK, BLACK
+		WHITE, BLACK, BLACK, WHITE
 	};
 
 public:
